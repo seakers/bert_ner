@@ -9,6 +9,7 @@ from spacy.util import minibatch, compounding
 MODELS_DIR = "models"
 DATASET_PATH = "data/EOSS_sentences"
 
+
 def get_train_set(threshold=500, path=DATASET_PATH):
     paths_list = [path + "/" + f_path for f_path in os.listdir(path)]
     train_data = []
@@ -19,6 +20,7 @@ def get_train_set(threshold=500, path=DATASET_PATH):
             train_data += data[:threshold]
     random.shuffle(train_data)
     return train_data
+
 
 def main(model=None, new_model_name="daphne_entities_13", models_dir=MODELS_DIR, n_iter=100):
     """Obtain Training Data"""
@@ -57,7 +59,6 @@ def main(model=None, new_model_name="daphne_entities_13", models_dir=MODELS_DIR,
     ner.add_label("NUMBER")  
     ner.add_label("YEAR")  
     ner.add_label("AGENT")  
-
 
     if model is None:
         optimizer = nlp.begin_training()

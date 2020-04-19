@@ -27,6 +27,7 @@ EOSS_SENTENCES_PATH = "data/EOSS_sentences"
 # Path where the parameters can be find
 PARAMS_PATH = "data/processed_parameters"
 
+
 def get_commands(commands_file_path):
     commands_info = { "parameters": [], "commands": [] } 
     with open(commands_file_path, "r") as command_file:
@@ -35,6 +36,7 @@ def get_commands(commands_file_path):
         commands_info["parameters"] = file_sections[1].strip("\n").split("\n")
         commands_info["commands"] = file_sections[-1].strip("\n").split("\n")
     return commands_info
+
 
 def get_command_placeholders_positions(command):
     regex = re.compile(r"\${([A-z0-9]+)}")
@@ -46,10 +48,12 @@ def get_command_placeholders_positions(command):
         param_spaces.append((start, end, parameter))
     return param_spaces
 
+
 def get_param_path(parameters, params_directory_path=PARAMS_PATH):
     params_names = set([param.split(" ")[1] for param in parameters])
     params_paths = {param_name: params_directory_path + "/" + param_name for param_name in params_names}
     return params_paths
+
 
 def sentence_combinations(command, command_param_placeholders, parameters):
     all_parameters = obtain_parameters()
@@ -72,6 +76,7 @@ def sentence_combinations(command, command_param_placeholders, parameters):
         every_possible_sentence.append((new_sentence, {"entities": entities_positions(new_sentence, possible_combination, parameters, [place_holder[-1] for place_holder in command_param_placeholders])}))
     return every_possible_sentence
 
+
 def entities_positions(sentence, parameters, parameters_mapping, entities):
     positions = []
     start = 0
@@ -83,6 +88,7 @@ def entities_positions(sentence, parameters, parameters_mapping, entities):
         start = end
     return positions
 
+
 def obtain_parameters(path=PARAMS_PATH):
     paths_list = [path + "/" + f_path for f_path in os.listdir(path)]
     parameters = {}
@@ -93,6 +99,7 @@ def obtain_parameters(path=PARAMS_PATH):
     # year exception for decreasing complexity
     parameters["year"] = ["nri"]
     return parameters
+
 
 def produce_sentences(path=EOSS_COMMANDS_PATH):
     paths_list = [path + "/" + f_path for f_path in os.listdir(path)]
