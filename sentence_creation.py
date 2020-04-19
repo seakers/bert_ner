@@ -80,7 +80,7 @@ def sentence_combinations(command, command_param_placeholders, parameters):
 def entities_positions(sentence, parameters, parameters_mapping, entities):
     positions = []
     start = 0
-    for indx, parameter in  enumerate(parameters):
+    for indx, parameter in enumerate(parameters):
         start = sentence.find(parameter, start)
         end = start + len(parameter)
         entity = parameters_mapping[entities[indx]].upper()
@@ -94,7 +94,7 @@ def obtain_parameters(path=PARAMS_PATH):
     parameters = {}
     for file_path in paths_list:
         with open(file_path, "r") as current_param_file:
-            parameters[file_path.split("/")[-1].replace(".txt", "")] = [param.strip("\n") for param in current_param_file.readlines()]
+            parameters[file_path.split("/")[-1].replace(".txt", "")] = [param.strip("\n ") for param in current_param_file.readlines()]
     
     # year exception for decreasing complexity
     parameters["year"] = ["nri"]
