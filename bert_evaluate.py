@@ -1,52 +1,92 @@
 from sys import argv
+from typing import Tuple
 
-import spacy
-from spacy.gold import spans_from_biluo_tags
-from transformers import BertTokenizer, TFBertForTokenClassification
-import tensorflow as tf
+from torch import Tensor
+from transformers import AutoTokenizer, AutoModelForTokenClassification
 import numpy as np
 
-MODEL_USED = "models/entities_bert/entities_bert_1.h5"
-nlp = spacy.load('en_core_web_sm')
+MODEL_USED = ".models/entities_bert/"
+
 
 # Returns 
 def ner(text, model=MODEL_USED):
     # Initialize tokenizer
-    tokenizer = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False)
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_USED, do_lower_case=False, use_fast=True)
+    model = AutoModelForTokenClassification.from_pretrained(MODEL_USED)
 
     # Generate label types
     labels = ["INSTRUMENT", "ORBIT", "DESIGN_ID", "INSTRUMENT_PARAMETER", "MEASUREMENT", "MISSION", "OBJECTIVE",
-              "ORBIT", "SPACE_AGENCY", "STAKEHOLDER", "SUBOBJECTIVE", "TECHNOLOGY", "NOT_PARTIAL_FULL", "NUMBER",
-              "YEAR", "AGENT"]
+              "SPACE_AGENCY", "STAKEHOLDER", "SUBOBJECTIVE", "TECHNOLOGY", "NOT_PARTIAL_FULL", "NUMBER",
+              "YEAR", "AGENT", "WAVEBAND"]
 
     label_types = ['O']
     for label in labels:
         label_types.append('B-' + label)
         label_types.append('I-' + label)
-        label_types.append('L-' + label)
-        label_types.append('U-' + label)
 
     # Create dicts for mapping from labels to IDs and back
     tag2idx = {t: i for i, t in enumerate(label_types)}
     idx2tag = {i: t for t, i in tag2idx.items()}
 
-    bert_model = TFBertForTokenClassification.from_pretrained('bert-base-cased', num_labels=len(label_types))
-    bert_model.load_weights(model)
+    sentence_tokens_for_model = tokenizer(text,
+                                          add_special_tokens=True,
+                                          padding='max_length',
+                                          truncation=True,
+                                          max_length=128,
+                                          return_token_type_ids=True,
+                                          return_attention_mask=True,
+                                          return_tensors='pt')
 
-    encoded_text = tokenizer.encode(text)
-    wordpieces = [tokenizer.decode(tok).replace(" ", "") for tok in encoded_text]
-    scores = bert_model(tf.constant(encoded_text)[None, :])[0]
+    sentence_tokens_for_postprocessing = tokenizer(text,
+                                                   add_special_tokens=True,
+                                                   padding='max_length',
+                                                   truncation=True,
+                                                   max_length=128,
+                                                   return_token_type_ids=True,
+                                                   return_attention_mask=True,
+                                                   return_offsets_mapping=True)
+
+    result: Tuple[Tensor] = model(**sentence_tokens_for_model)
+    scores = result[0].detach().numpy()
     label_ids = np.argmax(scores, axis=2)
     predictions = [idx2tag[i] for i in label_ids[0]]
-    wp_preds = list(zip(wordpieces, predictions))
-    toplevel_preds = [pair[1] for pair in wp_preds if "##" not in pair[0]]
-    str_rep = " ".join([t[0] for t in wp_preds]).replace(" ##", "").split()
 
-    doc = nlp(" ".join(str_rep[1:-1]))
-    doc.ents = spans_from_biluo_tags(doc, toplevel_preds[1:-1])
-    print(doc)
-    for ent in doc.ents:
-        print(ent, ent.label_)
+    # Converts tags to 1/word
+    entities = []
+    current_state = 'O'
+    current_word = -1
+    current_entity = None
+    spans = sentence_tokens_for_postprocessing.data["offset_mapping"][1:]
+    for idx, ent_tag in enumerate(predictions[1:]):
+        word_idx = sentence_tokens_for_postprocessing.token_to_word(idx+1)
+        if word_idx is None:
+            break
+        # Ignore all subwords when creating tags
+        if current_word != word_idx:
+            current_word = word_idx
+            tag_info = ent_tag.split('-')
+            if tag_info[0] in ['B', 'I']:
+                # If beginning, start new entity and close last one
+                if tag_info[0] == 'B':
+                    if current_entity is not None:
+                        entities.append(current_entity)
+                    current_entity = [spans[idx][0], spans[idx][1], tag_info[1]]
+                    current_state = tag_info[1]
+                elif tag_info[0] == 'I' and tag_info[1] == current_state:
+                    current_entity[1] = spans[idx][1]
+            else:
+                # Close current entity if exists
+                if current_entity is not None:
+                    entities.append(current_entity)
+                    current_entity = None
+                current_state = 'O'
+    # Add last entity if it exists
+    if current_entity is not None:
+        entities.append(current_entity)
+
+    print(text)
+    for entity in entities:
+        print(f"\"{text[entity[0]:entity[1]]}\" is a {entity[2]}")
 
 
 if __name__ == "__main__":
