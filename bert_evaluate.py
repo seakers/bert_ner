@@ -80,6 +80,9 @@ def ner(text, model=MODEL_USED):
                     entities.append(current_entity)
                     current_entity = None
                 current_state = 'O'
+        else:
+            if current_entity is not None:
+                current_entity[1] = spans[idx][1]
     # Add last entity if it exists
     if current_entity is not None:
         entities.append(current_entity)
